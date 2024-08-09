@@ -1,59 +1,37 @@
 import abc
-from typing import List
 
-import numpy as np
-import pandas as pd
 import torch
 
-from metric.classification import ClassificationMetric
+from evaluation.evaluator import Evaluator, Logger
 
 
 class Trainer(abc.ABC):
     def __init__(
-            self, model: torch.nn.Module,
+            self,
+            model: torch.nn.Module,
+            train_loader,
+            val_loader,
             loss_fn,
-            optimizer: torch.optim.optimizer.Optimizer,
-            device: str,
-            metrics: List[ClassificationMetric] = None,
-            log_freq=100,
+            optimizer: torch.optim.Optimizer,
+            evaluator: Evaluator,
+            logger: Logger,
+            print_log: bool = True,
+            device: str = 'cuda',
+            plotter=None
     ):
+        self.train_loader = train_loader
+        self.val_loader = val_loader
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
         self.device = torch.device(device)
         self.model = model.to(self.device)
-        self.metrics = metrics
-
-        if log_freq:
-            self.logging = True
-            self.log_freq = log_freq
-            self.logger = Logger(metrics)
-        else:
-            self.logging = False
+        self.evaluator = evaluator
+        self.logger = logger
+        self.last_iter = 0
+        self.print_log = print_log
 
     @abc.abstractmethod
-    def train(self, loader: torch.utils.data.DataLoader):
+    def train(self):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def test(self, loader: torch.utils.data.DataLoader):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def compute_metrics(self, pred, gt):
-        raise NotImplementedError
-
-
-class Logger:
-    def __init__(self, metrics: List[ClassificationMetric]):
-        columns = ({'loss': pd.Series(dtype=float), } |
-                   {metric.name: pd.Series(dtype=metric.dtype) for metric in metrics})
-        index = pd.Index([0, ], dtype=np.int32)
-        self.log = pd.DataFrame(index=index, data=columns)
-
-    def log_loss(self, it, loss):
-        self.log.loc[it, 'loss'] = loss
-
-    def log_metrics(self, it, metrics):
-        for name, value in metrics:
-            self.log.loc[it, name] = value
