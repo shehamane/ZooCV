@@ -25,13 +25,13 @@ class Animals10(Dataset):
 
     NAMES = ('squirrel', 'dog', 'horse', 'elephant', 'spider', 'cow', 'butterfly', 'chicken', 'cat', 'sheep')
 
-    def __prepare(self, src, dst):
-        if not os.path.exists(dst):
-            os.makedirs(dst)
-        dst_images_dir = os.path.join(dst, 'images')
+    def _prepare(self, src, root):
+        if not os.path.exists(root):
+            os.makedirs(root)
+        dst_images_dir = os.path.join(root, 'images')
         if not os.path.exists(dst_images_dir):
             os.makedirs(dst_images_dir)
-        dst_labels_path = os.path.join(dst, 'labels.txt')
+        dst_labels_path = os.path.join(root, 'labels.txt')
 
         im_root_dir_path = os.path.join(src, 'raw-img')
 
@@ -55,14 +55,23 @@ class Animals10(Dataset):
         with open(dst_labels_path) as labels_f:
             self.labels = labels_f.read().splitlines()
 
-    def __init__(self, src, dst, transform=None, prepare=False):
+    def _load_labels(self, root_path):
+        labels_path = os.path.join(root_path, 'labels.txt')
+        with open(labels_path) as labels_f:
+            self.labels = labels_f.read().splitlines()
+
+    def __init__(self, root, src=None, transform=None, prepare=False):
         src = os.path.abspath(src)
-        dst = os.path.abspath(dst)
+        root = os.path.abspath(root)
 
         if prepare:
-            self.__prepare(src, dst)
+            if src is None:
+                raise ValueError('Provide source dataset root path')
+            self._prepare(src, root)
+        else:
+            self._load_labels(root)
 
-        self.root_dir = dst
+        self.root_dir = root
 
         if isinstance(transform, list) or isinstance(transform, tuple):
             self.transform = torchvision.transforms.Compose(transform)

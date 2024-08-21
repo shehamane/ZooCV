@@ -2,9 +2,11 @@ import abc
 from typing import List
 
 import torch
+from torch.utils.data import DataLoader
 
 from evaluation.logging import Logger, Printer
 from evaluation.metrics import Metric, ArtifactDrawer, ClassificationMetricCalculator
+from model.model import ClassificationModel
 
 
 class Evaluator(abc.ABC):
@@ -23,19 +25,22 @@ class Evaluator(abc.ABC):
     @abc.abstractmethod
     def evaluate(self, model: torch.nn.Module,
                  loader: torch.utils.data.DataLoader,
-                 num_classes: int,
                  loss_fn: torch.nn.modules.loss._Loss,
                  eval_id=None):
         raise NotImplementedError
 
 
 class ClassificationEvaluator(Evaluator):
-    def evaluate(self, model, loader, num_classes, loss_fn, eval_id=None):
+    def evaluate(self,
+                 model: ClassificationModel,
+                 loader: DataLoader,
+                 loss_fn: torch.nn.modules.loss._Loss,
+                 eval_id=None):
         if eval_id is None:
             eval_id = self.runs
 
-        model.eval()
-        metrics_calculator = ClassificationMetricCalculator(num_classes)
+        model.nn.eval()
+        metrics_calculator = ClassificationMetricCalculator(num_classes=model.nc)
         metrics_calculator.check_compatibility(self.metrics)
 
         preds = {}
@@ -43,10 +48,11 @@ class ClassificationEvaluator(Evaluator):
         im_idx = 0
 
         total_loss = 0
+        results = {}
         with torch.no_grad():
             for it, (images, labels) in enumerate(loader):
                 images, labels = images.to(self.device), labels.to(self.device)
-                logits = model(images)
+                logits = model.nn(images)
                 total_loss += loss_fn(logits, labels)
 
                 labels_pred = logits.argmax(1).detach().cpu().numpy()

@@ -1,0 +1,15 @@
+input:
+  w: 28
+  h: 28
+  ch: 1
+activation: Sigmoid
+backbone: [
+  [-1, 1, Conv, [6, 5, 1, 2]],
+  [-1, 1, AvgPool, [2, 2]],
+  [-1, 1, Conv, [16, 5]],
+  [-1, 1, AvgPool, [2, 2]],
+  [ -1, 1, FC, [ 120 ] ],
+  [ -1, 1, FC, [ 84 ] ],
+  [ -1, 1, FC, [ 10 ] ],
+  [ -1, 1, Softmax ]
+]

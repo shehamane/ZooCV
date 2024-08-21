@@ -14,10 +14,9 @@ class Metric(Enum):
     Precision = 6
     Recall = 7
     F1 = 8
-    AP50 = 9
-    AP75 = 10
-    AP90 = 11
-    MAP = 12
+    AP_50 = 9
+    AP_50_95 = 10
+    mAP = 12
 
 
 def metrics2names(metrics: List[Metric]) -> List[str]:
@@ -102,8 +101,10 @@ class ClassificationMetricCalculator(MetricCalculator):
 
 
 class DetectionMetricCalculator(MetricCalculator):
-    def __call__(self, gt: Dict[str, np.ndarray], preds: Dict[str, np.ndarray]):
-        pass
+    def calculated_metrics(self) -> List[Metric]:
+        return [Metric.GT, Metric.FP, Metric.TP, Metric.FN,
+                Metric.Accuracy, Metric.Recall, Metric.Precision,
+                Metric.F1]
 
 
 class ArtifactDrawer(ABC):

@@ -56,7 +56,6 @@ class NotebookLogger(Logger):
 class Printer(Logger):
     def __init__(self, metrics: List[Metric], save_path=None):
         super().__init__(metrics)
-        self.print_header = True
         self.col_widths = {str(metric.name): len(metric.name) for metric in metrics}
         self.save_path = save_path
 
@@ -66,10 +65,8 @@ class Printer(Logger):
     def log_metrics(self, idx, metrics: Dict[str, float]):
         print('=================')
         print(f'Metrics for id {idx}:')
-        if self.print_header:
-            header = ' | '.join(f'{key:<{self.col_widths[key]}}' for key in self.col_widths.keys())
-            print(header)
-            self.print_header = False
+        header = ' | '.join(f'{key:<{self.col_widths[key]}}' for key in self.col_widths.keys())
+        print(header)
 
         row = ' | '.join(f'{metrics[key]:<{self.col_widths[key]}}' for key in self.col_widths.keys())
         print(row)

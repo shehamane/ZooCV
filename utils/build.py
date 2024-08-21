@@ -1,24 +1,23 @@
-import yaml
 import re
 import ast
 
-import numpy as np
 from torch import nn
+import numpy as np
+
+from layer.general import Conv, FC, AvgPool, Softmax
 
 
 class ModelBuilder:
     VAR_REGEX = re.compile(r'\$\{(\w+)\}')
 
-    PARAMETRIZED_LAYERS = ('Conv', 'FC', 'MP', 'Dropout')
-    SIMPLE_LAYERS = ('Flatten',)
+    PARAMETRIZED_LAYERS = ('Conv', 'FC', 'MP', 'AvgPool', 'Dropout')
+    SIMPLE_LAYERS = ('Flatten', 'Softmax')
 
-    def __init__(self, config_path):
-        with open(config_path, 'r') as config_f:
-            config = yaml.safe_load(config_f)
-            self.backbone = config['backbone']
-            self.activation = config['activation']
-            self.vars = config['vars']
-            self.input_shape = (config['input']['w'], config['input']['h'], config['input']['ch'])
+    def __init__(self, config: dict):
+        self.backbone = config['backbone']
+        self.activation = config['activation']
+        self.vars = config['vars']
+        self.input_shape = (config['input']['w'], config['input']['h'], config['input']['ch'])
 
     def _replace_vars(self, seq):
         for var_name in self.vars:
@@ -35,11 +34,11 @@ class ModelBuilder:
     def _calc_conv_out_shape(self, w, h, n, k, s=1, p=0):
         return int((w - k + 2 * p) / s + 1), int((h - k + 2 * p) / s + 1), n
 
-    def _build(self, layers: list, input_shape) -> (nn.Module, tuple):
+    def _build(self, layers: list, input_shape, idx=None, from_idx=-1) -> (nn.Module, tuple):
         build_layers = []
         cur_shape = input_shape
 
-        for layer_desc in layers:
+        for layer_idx, layer_desc in enumerate(layers):
             if not isinstance(layer_desc, list):
                 raise "Layer should be a list"
 
@@ -54,23 +53,29 @@ class ModelBuilder:
                         params = [self._parse_exp(exp) for exp in layer_desc[3]]
 
                     if type_ == 'Conv':
-                        layer = nn.Conv2d(cur_shape[-1], *params)
+                        layer = Conv(cur_shape[-1], *params, idx=layer_idx, from_idx=from_)
                         cur_shape = self._calc_conv_out_shape(*cur_shape[:2], *params)
                     elif type_ == 'FC':
-                        layer = nn.Linear(cur_shape[-1], *params)
+                        if len(cur_shape) > 1:
+                            flatten = nn.Flatten()
+                            cur_shape = (np.prod(cur_shape),)
+                            build_layers.append(flatten)
+                        layer = FC(cur_shape[-1], *params, idx=layer_idx, from_idx=from_)
                         cur_shape = (params[0],)
-                    elif type_ == 'MP':
+                    elif type_ == 'MaxPool':
                         layer = nn.MaxPool2d(*params)
+                        cur_shape = self._calc_conv_out_shape(*cur_shape[:3], *params)
+                    elif type_ == 'AvgPool':
+                        layer = AvgPool(*params, idx=layer_idx, from_idx=from_)
                         cur_shape = self._calc_conv_out_shape(*cur_shape[:3], *params)
                     elif type_ == 'Dropout':
                         layer = nn.Dropout(*params)
                 elif type_ in self.SIMPLE_LAYERS:
-                    if type_ == 'Flatten':
-                        layer = nn.Flatten()
-                        cur_shape = (int(np.prod(cur_shape)),)
+                    if type_ == 'Softmax':
+                        layer = Softmax(dim=1, idx=layer_idx, from_idx=from_)
                 elif type_ == 'Block':
                     block_layers = layer_desc[3]
-                    layer, cur_shape = self._build(block_layers, cur_shape)
+                    layer, cur_shape = self._build(block_layers, cur_shape, layer_idx, from_)
                 build_layers.append(layer)
 
         return nn.Sequential(*build_layers), cur_shape
