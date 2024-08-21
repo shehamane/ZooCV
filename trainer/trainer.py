@@ -1,23 +1,24 @@
 import abc
 
 import torch
+from torch.utils.data import DataLoader
 
-from evaluation.evaluator import Evaluator, Logger
+from evaluation.eval import Evaluator, Logger
+from evaluation.logging import Printer
 
 
 class Trainer(abc.ABC):
     def __init__(
             self,
             model: torch.nn.Module,
-            train_loader,
-            val_loader,
-            loss_fn,
+            train_loader: DataLoader,
+            val_loader: DataLoader,
+            loss_fn: torch.nn.modules.loss._Loss,
             optimizer: torch.optim.Optimizer,
             evaluator: Evaluator,
-            logger: Logger,
-            print_log: bool = True,
+            logger: Logger = None,
+            eval_freq: int = 1000,
             device: str = 'cuda',
-            plotter=None
     ):
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -27,11 +28,11 @@ class Trainer(abc.ABC):
         self.device = torch.device(device)
         self.model = model.to(self.device)
         self.evaluator = evaluator
-        self.logger = logger
         self.last_iter = 0
-        self.print_log = print_log
+        self.eval_freq = eval_freq
+        if logger is None:
+            self.logger = Printer([])
 
     @abc.abstractmethod
     def train(self):
         raise NotImplementedError
-
