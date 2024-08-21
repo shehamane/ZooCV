@@ -1,29 +1,27 @@
 import abc
-from typing import List
+from typing import List, Type
 
 import torch
 from torch.utils.data import DataLoader
 
 from evaluation.logging import Logger, Printer
 from evaluation.metrics import Metric, ArtifactDrawer, ClassificationMetricCalculator
-from model.model import ClassificationModel
+from model.model import ClassificationModel, Model
 
 
 class Evaluator(abc.ABC):
     def __init__(self,
                  metrics: List[Metric],
                  artifacts: List[ArtifactDrawer] = None,
-                 logger: Logger = None,
+                 logger: Type[Logger] = Printer,
                  device='cuda'):
         self.metrics = metrics
         self.artifacts = artifacts
         self.device = torch.device(device)
-        if logger is None:
-            self.logger = Printer(metrics)
-        self.runs = 0
+        self.logger = logger(self.metrics)
 
     @abc.abstractmethod
-    def evaluate(self, model: torch.nn.Module,
+    def evaluate(self, model: Model,
                  loader: torch.utils.data.DataLoader,
                  loss_fn: torch.nn.modules.loss._Loss,
                  eval_id=None):
@@ -35,20 +33,16 @@ class ClassificationEvaluator(Evaluator):
                  model: ClassificationModel,
                  loader: DataLoader,
                  loss_fn: torch.nn.modules.loss._Loss,
-                 eval_id=None):
-        if eval_id is None:
-            eval_id = self.runs
-
+                 eval_id=1):
         model.nn.eval()
         metrics_calculator = ClassificationMetricCalculator(num_classes=model.nc)
         metrics_calculator.check_compatibility(self.metrics)
 
         preds = {}
-        gt = {}
-        im_idx = 0
+        gts = {}
 
+        im_id = 0
         total_loss = 0
-        results = {}
         with torch.no_grad():
             for it, (images, labels) in enumerate(loader):
                 images, labels = images.to(self.device), labels.to(self.device)
@@ -59,10 +53,11 @@ class ClassificationEvaluator(Evaluator):
                 labels_gt = labels.detach().cpu().numpy()
 
                 for label_pred, label_gt in zip(labels_pred, labels_gt):
-                    preds[im_idx] = label_pred
-                    gt[im_idx] = label_gt
-                    im_idx += 1
+                    preds[im_id] = label_pred
+                    gts[im_id] = label_gt
+                    im_id += 1
 
-        metrics, metrics_per_class = metrics_calculator(gt, preds)
+        metrics, metrics_per_class = metrics_calculator(gts, preds)
+        avg_loss = (total_loss / len(loader.dataset)).item()
+        self.logger.log_loss(eval_id, avg_loss)
         self.logger.log_metrics(eval_id, metrics)
-        self.runs += 1

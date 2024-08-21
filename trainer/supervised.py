@@ -42,8 +42,6 @@ class ClassificationTrainer(Trainer):
             if it % self.eval_freq == 0:
                 self.evaluator.evaluate(self.model, self.val_loader, self.loss_fn, it)
                 self.model.nn.train()
-        else:
-            it = self.last_iter
 
         avg_loss = total_loss / len(self.train_loader.dataset)
         self.logger.log_loss(it, avg_loss)

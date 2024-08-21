@@ -71,8 +71,11 @@ class ClassificationMetricCalculator(MetricCalculator):
         metrics[Metric.Accuracy.name] = metrics[Metric.TP.name] / metrics[Metric.GT.name]
         metrics[Metric.Precision.name] = metrics[Metric.TP.name] / (metrics[Metric.TP.name] + metrics[Metric.FP.name])
         metrics[Metric.Recall.name] = metrics[Metric.TP.name] / metrics[Metric.GT.name]
-        metrics[Metric.F1.name] = 2 * metrics[Metric.Precision.name] * metrics[Metric.Recall.name] / (
-                + metrics[Metric.Precision.name] + metrics[Metric.Recall.name])
+        if metrics[Metric.Recall.name] == 0 and metrics[Metric.Precision.name] == 0:
+            metrics[Metric.F1.name] = 0
+        else:
+            metrics[Metric.F1.name] = 2 * metrics[Metric.Precision.name] * metrics[Metric.Recall.name] / (
+                    + metrics[Metric.Precision.name] + metrics[Metric.Recall.name])
         for label in range(self.num_classes):
             metrics_per_class[label][Metric.Accuracy.name] = (metrics_per_class[label][Metric.TP.name] /
                                                               metrics_per_class[label][Metric.GT.name])

@@ -18,7 +18,7 @@ class Logger(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def log_metrics(self, idx, metrics: Dict[Metric, float]):
+    def log_metrics(self, idx, metrics: Dict[str, float]):
         raise NotImplementedError
 
     @abstractmethod
@@ -29,22 +29,26 @@ class Logger(ABC):
 class NotebookLogger(Logger):
     def __init__(self, metrics: List[Metric]):
         super().__init__(metrics)
-        self.metrics_dict = {metric: [] for metric in self.metrics} | {'id': [], 'loss': []}
+        self.metrics_dict = {metric.name: [] for metric in self.metrics} | {'id': [], 'loss': []}
         self.artifacts_dict = {}
 
     def log_loss(self, idx, loss: float):
         self.metrics_dict['loss'].append(loss)
+        print(f'Validation loss: {loss}')
 
-    def log_metrics(self, idx, metrics: Dict[Metric, float]):
+    def log_metrics(self, idx, metrics: Dict[str, float]):
         self.metrics_dict['id'].append(idx)
-        for metric, value in metrics.items():
-            self.metrics_dict[metric].append(value)
+        for metric in self.metrics:
+            self.metrics_dict[metric.name].append(metrics[metric.name])
+
+        print('Current metrics:')
+        print(self.get_log())
 
     def log_artifact(self, name: str, artifact: Any):
         self.artifacts_dict[name] = artifact
 
     def get_log(self):
-        return pd.DataFrame(data=self.metrics_dict).set_index(self.metrics_dict['id'], inplace=True)
+        return pd.DataFrame(data=self.metrics_dict).set_index('id')
 
     def get_artifacts_names(self):
         return list(self.artifacts_dict.keys())
