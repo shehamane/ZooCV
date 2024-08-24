@@ -2,7 +2,7 @@ from abc import ABC
 
 import yaml
 
-from evaluation.utils import Result, ClassificationResult
+from evaluation.utils import Result, ClassificationResult, DetectionResult
 from utils.build import ModelBuilder
 
 
@@ -30,4 +30,17 @@ class ClassificationModel(Model, ABC):
         self.nn = builder.build()
 
     def __call__(self, x) -> ClassificationResult:
+        raise NotImplementedError
+
+
+class DetectionModel(Model, ABC):
+    def __init__(self, config, nc, conf_thresh):
+        super().__init__(config)
+
+        self.nc = self.config['vars']['nc'] = nc
+        builder = ModelBuilder(self.config)
+        self.nn = builder.build()
+        self.conf_thresh = conf_thresh
+
+    def __call__(self, x) -> DetectionResult:
         raise NotImplementedError

@@ -4,18 +4,18 @@ import ast
 from torch import nn
 import numpy as np
 
-from layer.general import Conv, FC, AvgPool, Softmax
+from layer.general import Conv, FC, AvgPool, Softmax, MaxPool, ConvBN
 
 
 class ModelBuilder:
     VAR_REGEX = re.compile(r'\$\{(\w+)\}')
 
-    PARAMETRIZED_LAYERS = ('Conv', 'FC', 'MP', 'AvgPool', 'Dropout')
+    PARAMETRIZED_LAYERS = ('Conv', 'ConvBN', 'FC', 'MaxPool', 'AvgPool', 'Dropout')
     SIMPLE_LAYERS = ('Flatten', 'Softmax')
 
     def __init__(self, config: dict):
         self.backbone = config['backbone']
-        self.activation = config['activation']
+        self.activation = config.get('activation', None)
         self.vars = config['vars']
         self.input_shape = (config['input']['w'], config['input']['h'], config['input']['ch'])
 
@@ -55,6 +55,9 @@ class ModelBuilder:
                     if type_ == 'Conv':
                         layer = Conv(cur_shape[-1], *params, idx=layer_idx, from_idx=from_)
                         cur_shape = self._calc_conv_out_shape(*cur_shape[:2], *params)
+                    elif type_ == 'ConvBN':
+                        layer = ConvBN(cur_shape[-1], *params, idx=layer_idx, from_idx=from_)
+                        cur_shape = self._calc_conv_out_shape(*cur_shape[:2], *params)
                     elif type_ == 'FC':
                         if len(cur_shape) > 1:
                             flatten = nn.Flatten()
@@ -63,7 +66,7 @@ class ModelBuilder:
                         layer = FC(cur_shape[-1], *params, idx=layer_idx, from_idx=from_)
                         cur_shape = (params[0],)
                     elif type_ == 'MaxPool':
-                        layer = nn.MaxPool2d(*params)
+                        layer = MaxPool(*params, idx=layer_idx, from_idx=from_)
                         cur_shape = self._calc_conv_out_shape(*cur_shape[:3], *params)
                     elif type_ == 'AvgPool':
                         layer = AvgPool(*params, idx=layer_idx, from_idx=from_)
@@ -76,6 +79,8 @@ class ModelBuilder:
                 elif type_ == 'Block':
                     block_layers = layer_desc[3]
                     layer, cur_shape = self._build(block_layers, cur_shape, layer_idx, from_)
+                else:
+                    raise Exception(f'Unknown layer: {type_}')
                 build_layers.append(layer)
 
         return nn.Sequential(*build_layers), cur_shape

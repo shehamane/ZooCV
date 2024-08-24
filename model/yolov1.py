@@ -1,70 +1,22 @@
 import torch
 from torch import nn
+from torch.nn.modules.loss import _Loss
+
+from model.model import DetectionModel
 
 
-class YoloV1(nn.Module):
-    def __init__(self):
-        super(YoloV1, self).__init__()
-        self.feature_extractor = nn.Sequential(
-            nn.Conv2d(3, 64, 7, stride=2),
-            nn.LeakyReLU(),
-            nn.MaxPool2d(2, stride=2),
-            nn.Conv2d(64, 192, 3),
-            nn.LeakyReLU(),
-            nn.MaxPool2d(2, stride=2),
-            nn.Conv2d(192, 128, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(128, 256, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 256, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 512, 3),
-            nn.LeakyReLU(),
-            nn.MaxPool2d(2, stride=2),
+class YoloV1(DetectionModel):
+    def __init__(self, config, num_classes, grid_size=7, preds_per_cell=2, conf_thresh=0.5):
+        super().__init__(config, num_classes, conf_thresh)
+        self.grid_size = self.config['vars']['S'] = grid_size
+        self.preds_per_cell = self.config['vars']['B'] = preds_per_cell
 
-            nn.Conv2d(512, 256, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 512, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 256, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 512, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 256, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 512, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 256, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(256, 512, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 512, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 1024, 3),
-            nn.LeakyReLU(),
-            nn.MaxPool2d(2, stride=2),
 
-            nn.Conv2d(1024, 512, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 1024, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(1024, 512, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(512, 1024, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(1024, 1024, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(1024, 1024, 3, stride=2),
-            nn.LeakyReLU(),
+class YoloV1Loss(_Loss):
+    def __init__(self, lambda_coord=5, lambda_noobj=0.5):
+        super().__init__()
+        self.lambda_coord = lambda_coord
+        self.lambda_noobj = lambda_noobj
 
-            nn.Conv2d(1024, 1024, 3),
-            nn.LeakyReLU(),
-            nn.Conv2d(1024, 1024, 3),
-            nn.LeakyReLU(),
-        )
-        self.region_classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(7 * 7 * 1024, 4096),
-            nn.LeakyReLU(),
-            nn.Linear(4096, 20),
-        )
+    def forward(self, predictions, targets):
+        pass

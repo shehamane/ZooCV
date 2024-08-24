@@ -41,6 +41,17 @@ class AvgPool(nn.Module):
         return self.avg(x)
 
 
+class MaxPool(nn.Module):
+    def __init__(self, kernel_size, stride, idx=None, from_idx=-1):
+        super().__init__()
+        self.mp = nn.MaxPool2d(kernel_size, stride)
+        self.idx = idx
+        self.from_idx = from_idx
+
+    def forward(self, x):
+        return self.mp(x)
+
+
 class FC(nn.Module):
     default_act = nn.ReLU
 
