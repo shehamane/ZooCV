@@ -16,7 +16,7 @@ class Trainer(abc.ABC):
             val_loader: DataLoader,
             loss_fn: torch.nn.modules.loss._Loss,
             optimizer: torch.optim.Optimizer,
-            evaluator: Evaluator,
+            evaluator: Evaluator = None,
             logger: Logger = None,
             eval_freq: int = 1000,
             device: str = 'cuda',

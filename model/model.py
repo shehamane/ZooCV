@@ -34,13 +34,14 @@ class ClassificationModel(Model, ABC):
 
 
 class DetectionModel(Model, ABC):
-    def __init__(self, config, nc, conf_thresh):
+    def __init__(self, config, nc, **kwargs):
         super().__init__(config)
 
         self.nc = self.config['vars']['nc'] = nc
+        for k, v in kwargs.items():
+            self.config['vars'][k] = v
         builder = ModelBuilder(self.config)
         self.nn = builder.build()
-        self.conf_thresh = conf_thresh
 
     def __call__(self, x) -> DetectionResult:
         raise NotImplementedError

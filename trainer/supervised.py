@@ -7,7 +7,7 @@ from model.model import ClassificationModel
 from trainer.trainer import Trainer
 
 
-class ClassificationTrainer(Trainer):
+class SimpleTrainer(Trainer):
     def __init__(
             self,
             model: ClassificationModel,
@@ -15,7 +15,7 @@ class ClassificationTrainer(Trainer):
             val_loader: DataLoader,
             loss_fn: torch.nn.modules.loss._Loss,
             optimizer: torch.optim.Optimizer,
-            evaluator: Evaluator,
+            evaluator: Evaluator = None,
             logger: Logger = None,
             eval_freq: int = 1000,
             device: str = 'cuda',
@@ -31,18 +31,19 @@ class ClassificationTrainer(Trainer):
 
             images, labels = images.to(self.device), labels.to(self.device)
 
-            logits_pred = self.model.nn(images)
-            loss = self.loss_fn(logits_pred, labels)
+            preds = self.model.nn(images)
+            loss = self.loss_fn(preds, labels)
             total_loss += loss.item()
 
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            if it % self.eval_freq == 0:
+            if self.evaluator is not None and it % self.eval_freq == 0:
                 self.evaluator.evaluate(self.model, self.val_loader, self.loss_fn, it)
                 self.model.nn.train()
 
         avg_loss = total_loss / len(self.train_loader.dataset)
-        self.logger.log_loss(it, avg_loss)
+        if self.logger is not None:
+            self.logger.log_loss(it, avg_loss)
         self.last_iter = it

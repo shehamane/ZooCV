@@ -62,3 +62,41 @@ class ClassificationDataset(BaseDataset):
             im = self.transform(im)
 
         return im, label
+
+
+class DetectionDataset(BaseDataset):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        im, label = self.receiver[idx]
+        if self.transform:
+            im = self.transform(im)
+
+        return im, label
+
+
+class BBox:
+    def __init__(self, x_center, y_center, w, h):
+        self.x = x_center
+        self.y = y_center
+        self.w = w
+        self.h = h
+
+    def xywh(self):
+        return (self.x - self.w/2, self.y - self.w/2, self.x + self.w/2, self.y + self.h)
+
+    def xyxy(self):
+        return (self.x, self.y, self.x + self.w, self.y + self.h)
+
+    def xywh_center:
+
+
+
+class Target(ABC):
+    def __init__(self, im_id):
+        self.im_id = im_id
+
+
+class DetectionTarget(Target):
+    def __init__(self, im_id, boxes, labels):
+        super().__init__(im_id)
+        self.boxes = boxes
+        self.labels = labels
