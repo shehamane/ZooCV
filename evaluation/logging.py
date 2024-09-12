@@ -1,6 +1,6 @@
 import os.path
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -10,58 +10,43 @@ from evaluation.metrics import Metric
 
 
 class Logger(ABC):
-    def __init__(self, metrics: List[Metric]):
-        self.metrics = metrics
-
     @abstractmethod
-    def log_loss(self, idx, loss: float):
+    def log_loss(self, idx, loss: float) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def log_metrics(self, idx, metrics: Dict[str, float]):
-        raise NotImplementedError
-
-    @abstractmethod
-    def log_artifact(self, name: str, artifact: Any):
+    def log_metrics(self, idx, metrics: Dict[str, float]) -> None:
         raise NotImplementedError
 
 
 class NotebookLogger(Logger):
     def __init__(self, metrics: List[Metric]):
         super().__init__(metrics)
-        self.metrics_dict = {metric.name: [] for metric in self.metrics} | {'id': [], 'loss': []}
-        self.artifacts_dict = {}
+        self.loss_dict = {'id': [], 'loss': []}
+        self.metrics_dict = {'id': []}
 
     def log_loss(self, idx, loss: float):
-        self.metrics_dict['loss'].append(loss)
+        self.loss_dict['loss'].append(loss)
         print(f'Validation loss: {loss}')
 
     def log_metrics(self, idx, metrics: Dict[str, float]):
         self.metrics_dict['id'].append(idx)
-        for metric in self.metrics:
-            self.metrics_dict[metric.name].append(metrics[metric.name])
+        for name, val in metrics.items():
+            if name not in self.metrics_dict.keys():
+                self.metrics_dict[name] = []
+            self.metrics_dict[name].append(val)
 
-        print('Current metrics:')
-        print(self.get_log())
+        print(f'Validation metrics: {metrics}')
 
-    def log_artifact(self, name: str, artifact: Any):
-        self.artifacts_dict[name] = artifact
 
-    def get_log(self):
-        return pd.DataFrame(data=self.metrics_dict).set_index('id')
+    def get_log(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        return (pd.DataFrame(data=self.loss_dict).set_index('id'),
+                pd.DataFrame(data=self.metrics_dict).set_index('id'))
 
-    def get_artifacts_names(self):
-        return list(self.artifacts_dict.keys())
-
-    def get_artifact(self, name):
-        return self.artifacts_dict[name]
 
 
 class Printer(Logger):
-    def __init__(self, metrics: List[Metric], save_path=None):
-        super().__init__(metrics)
-        self.col_widths = {str(metric.name): len(metric.name) for metric in metrics}
-        self.save_path = save_path
+    COLUMN_WIDTH = 10
 
     def log_loss(self, idx, loss: float):
         print(f'Loss for id {idx}: {loss:<6}')
@@ -69,16 +54,27 @@ class Printer(Logger):
     def log_metrics(self, idx, metrics: Dict[str, float]):
         print('=================')
         print(f'Metrics for id {idx}:')
-        header = ' | '.join(f'{key:<{self.col_widths[key]}}' for key in self.col_widths.keys())
+        header = ' | '.join(f'{key:<{self.COLUMN_WIDTH}}' for key in metrics.keys())
         print(header)
 
-        row = ' | '.join(f'{metrics[key]:<{self.col_widths[key]}}' for key in self.col_widths.keys())
+        row = ' | '.join(f'{metrics[key]:<{self.COLUMN_WIDTH}}' for key in metrics.keys())
         print(row)
         print('=================')
 
 
-    def log_artifact(self, name: str, artifact: plt.Figure, ext='png'):
-            if self.save_path is not None:
-                plt.savefig(os.path.join(self.save_path, f'{name}.{ext}'))
-            else:
-                raise 'Save path is not specified'
+
+
+import mlflow
+
+class MLFlowLogger(Logger):
+    def __init__(self, metrics: List[Metric], exp_name, host='127.0.0.1', port=8081):
+        super().__init__(metrics)
+        mlflow.set_tracking_uri(f'http://{host}:{port}')
+        mlflow.set_experiment(exp_name)
+        mlflow.start_run()
+
+    def log_loss(self, idx, loss: float):
+        mlflow.log_metric('loss', loss)
+
+    def __del__(self):
+        mlflow.end_run()

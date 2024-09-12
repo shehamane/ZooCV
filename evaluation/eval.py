@@ -6,25 +6,24 @@ from torch.utils.data import DataLoader
 
 from evaluation.logging import Logger, Printer
 from evaluation.metrics import Metric, ArtifactDrawer, ClassificationMetricCalculator
+from evaluation.utils import ClassificationResult
 from model.model import ClassificationModel, Model
 
 
 class Evaluator(abc.ABC):
     def __init__(self,
-                 metrics: List[Metric],
-                 artifacts: List[ArtifactDrawer] = None,
-                 logger: Type[Logger] = Printer,
+                 logger: Logger = None,
                  device='cuda'):
-        self.metrics = metrics
-        self.artifacts = artifacts
         self.device = torch.device(device)
-        self.logger = logger(self.metrics)
+        if logger is None:
+            self.logger = Printer()
 
     @abc.abstractmethod
-    def evaluate(self, model: Model,
+    def evaluate(self,
+                 model: Model,
                  loader: torch.utils.data.DataLoader,
                  loss_fn: torch.nn.modules.loss._Loss,
-                 eval_id=None):
+                 eval_id=None) -> None:
         raise NotImplementedError
 
 
@@ -33,10 +32,9 @@ class ClassificationEvaluator(Evaluator):
                  model: ClassificationModel,
                  loader: DataLoader,
                  loss_fn: torch.nn.modules.loss._Loss,
-                 eval_id=1):
+                 eval_id=1) -> None:
         model.nn.eval()
-        metrics_calculator = ClassificationMetricCalculator(num_classes=model.nc)
-        metrics_calculator.check_compatibility(self.metrics)
+        metrics_calculator = ClassificationMetricCalculator()
 
         preds = {}
         gts = {}
@@ -46,18 +44,16 @@ class ClassificationEvaluator(Evaluator):
         with torch.no_grad():
             for it, (images, labels) in enumerate(loader):
                 images, labels = images.to(self.device), labels.to(self.device)
-                logits = model.nn(images)
-                total_loss += loss_fn(logits, labels)
+                logits_b = model.nn(images)
+                total_loss += loss_fn(logits_b, labels)
 
-                labels_pred = logits.argmax(1).detach().cpu().numpy()
-                labels_gt = labels.detach().cpu().numpy()
-
-                for label_pred, label_gt in zip(labels_pred, labels_gt):
-                    preds[im_id] = label_pred
-                    gts[im_id] = label_gt
+                for logits, label_gt in zip(logits_b, labels):
+                    preds[im_id] = ClassificationResult(logits.unsqueeze(0))
+                    gts[im_id] = ClassificationResult(torch.nn.functional.one_hot(label_gt, num_classes=logits.shape[0]).unsqueeze(0))
                     im_id += 1
 
-        metrics, metrics_per_class = metrics_calculator(gts, preds)
-        avg_loss = (total_loss / len(loader.dataset)).item()
+        gt, tp, accuracy = metrics_calculator.calculate(preds, gts)
+        metrics = {'Accuracy': accuracy}
+        avg_loss = (total_loss / len(loader)).item()
         self.logger.log_loss(eval_id, avg_loss)
         self.logger.log_metrics(eval_id, metrics)

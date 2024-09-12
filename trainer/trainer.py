@@ -19,6 +19,7 @@ class Trainer(abc.ABC):
             evaluator: Evaluator = None,
             logger: Logger = None,
             eval_freq: int = 1000,
+            log_freq: int = 10,
             device: str = 'cuda',
     ):
         self.train_loader = train_loader
@@ -29,11 +30,12 @@ class Trainer(abc.ABC):
         self.device = torch.device(device)
         self.model.nn = self.model.nn.to(self.device)
         self.evaluator = evaluator
-        self.last_iter = 0
+        self.it = 0
         self.eval_freq = eval_freq
+        self.log_freq = log_freq
         if logger is None:
-            self.logger = Printer([])
+            self.logger = Printer()
 
     @abc.abstractmethod
-    def train(self):
+    def train(self) -> None:
         raise NotImplementedError

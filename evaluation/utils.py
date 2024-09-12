@@ -1,35 +1,79 @@
-from abc import ABC
-from typing import Tuple, List
+from abc import ABC, abstractmethod
+from typing import Iterator
+from torchtyping import TensorType
 
 import torch
 
 
-class Result(ABC):
+class Predict(ABC):
     pass
 
 
-class ClassificationResult(Result):
-    def __init__(self, class_id, conf):
-        self.class_id = class_id
-        self.conf = conf
+class ClassificationPredict(Predict):
+    def __init__(self, probs: TensorType['C']):
+        self.probs = probs
+
+    @property
+    def cls(self) -> int:
+        return self.probs.argmax().item()
 
 
 class BBox:
-    def __init__(self, x1, y1, x2, y2):
+    def __init__(self, x1: float, y1: float, x2: float, y2: float):
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
         self.y2 = y2
 
 
-class DetectionResult(Result):
-    # Takes 2D Tensor with shape (N, 5), one prediction looks like (cls, x1, y1, x2, y2, conf)
+class DetectionPredict(Predict):
+    def __init__(self, pred: TensorType[6]):
+        self.pred = pred
 
-    def __init__(self, preds: torch.Tensor):
-        self.bboxes: List[Tuple[int, BBox, float]] = []
-        for pred in preds:
-            pred_np = pred.detach().cpu().numpy()
-            class_id = pred_np[0]
-            bbox = BBox(pred_np[1], pred_np[2], pred_np[3], pred_np[4])
-            conf = pred_np[5]
-            self.bboxes.append((class_id, bbox, conf))
+    @property
+    def bbox(self) -> BBox:
+        return BBox(*self.pred[1:-1])
+
+    @property
+    def cls(self) -> int:
+        return self.pred[0].item()
+
+    @property
+    def conf(self) -> float:
+        return self.pred[-1].item()
+
+
+class Result(ABC):
+    def __init__(self, preds: TensorType):
+        self.preds = preds
+
+    def __len__(self):
+        return self.preds.shape[0]
+
+    @abstractmethod
+    def __getitem__(self, key: int):
+        raise NotImplementedError
+
+
+class ClassificationResult(Result):
+    def __init__(self, preds: TensorType['N', 'C']):
+        super().__init__(preds)
+
+    def __getitem__(self, key: int) -> ClassificationPredict:
+        return ClassificationPredict(self.preds[key])
+
+    def __iter__(self) -> Iterator[ClassificationPredict]:
+        for i in range(self.preds.shape[0]):
+            yield self[i]
+
+
+class DetectionResult(Result):
+    def __init__(self, preds: TensorType['N', 6]):
+        super().__init__(preds)
+
+    def __getitem__(self, key: int) -> DetectionPredict:
+        return DetectionPredict(self.preds[key])
+
+    def __iter__(self) -> Iterator[DetectionPredict]:
+        for i in range(self.preds.shape[0]):
+            yield self[i]
